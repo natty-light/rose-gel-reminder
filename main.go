@@ -40,12 +40,12 @@ func main() {
 		panic(err)
 	}
 
-	data, err, isLeft := constructMessage(env, msg, *config, s)
+	data, err, isLeft := constructMessage(msg, *config, s)
 	if err != nil {
 		panic(err)
 	}
 
-	res, err := d.ChannelMessageSendComplex(env.ChannelId, data)
+	res, err := d.ChannelMessageSendComplex(config.ChannelId, data)
 	if err != nil {
 		panic(fmt.Sprint("d.ChannelMessageSendComplex error", err))
 	}
@@ -97,13 +97,13 @@ func getConfig(s *utils.S3DataSource) (*utils.RunConfiguration, error) {
 	return config, nil
 }
 
-func constructMessage(env utils.Env, file *s3.GetObjectOutput, config utils.RunConfiguration, s *utils.S3DataSource) (data *discordgo.MessageSend, err error, isLeft bool) {
+func constructMessage(file *s3.GetObjectOutput, config utils.RunConfiguration, s *utils.S3DataSource) (data *discordgo.MessageSend, err error, isLeft bool) {
 	if config.IsGel {
 		content, err := s.ParseResponseToString(file)
 		if err != nil {
 			return nil, fmt.Errorf("ParseResponseToString error: %v", err), false
 		}
-		data = &discordgo.MessageSend{Content: fmt.Sprintf("<@%s> %s", env.RoseUserId, content), AllowedMentions: &discordgo.MessageAllowedMentions{Users: []string{env.RoseUserId}}}
+		data = &discordgo.MessageSend{Content: fmt.Sprintf("<@%s> %s", config.TagUser, content), AllowedMentions: &discordgo.MessageAllowedMentions{Users: []string{config.TagUser}}}
 		isLeft = content == "left"
 	} else {
 		discordData, err := s.ParseFile(file, config.FileName)

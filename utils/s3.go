@@ -27,9 +27,10 @@ type S3DataSource struct {
 
 type RunConfiguration struct {
 	NoTagList []string `json:"no_tag_list"`
-	ChannelId string   `json:"channelId"`
+	ChannelId string   `json:"channel_id"`
 	FileName  string   `json:"file_name"`
 	IsGel     bool     `json:"is_gel"`
+	TagUser   string   `json:"tag_user"`
 }
 
 func CreateS3Datasource(env *Env, pathPrefix string) (*S3DataSource, error) {
