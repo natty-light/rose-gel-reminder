@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"path"
 	"roseGelReminder/utils"
-	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -52,7 +51,8 @@ func main() {
 	}
 
 	fmt.Println("Send successful", res)
-	err = s.UploadFile(res.Timestamp.Format(time.UnixDate), TimestampFile)
+	newTimestamp := res.Timestamp.Format(time.UnixDate)
+	err = s.UploadFile(newTimestamp, TimestampFile)
 	if err != nil {
 		panic(fmt.Sprint("timestamp upload error", err))
 	}
@@ -72,9 +72,7 @@ func main() {
 
 func getPathPrefix() string {
 	now := time.Now()
-	weekday := strings.ToLower(now.Weekday().String())
-	hour := fmt.Sprintf("%02d00", now.Hour())
-	return path.Join(weekday, hour)
+	return fmt.Sprintf("%02d00", now.Hour())
 }
 
 func fetchMessageContent(s *utils.S3DataSource, config utils.RunConfiguration) (*s3.GetObjectOutput, error) {

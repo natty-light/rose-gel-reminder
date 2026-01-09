@@ -39,7 +39,7 @@ func CreateS3Datasource(env *Env, pathPrefix string) (*S3DataSource, error) {
 	}
 	cfg.Region = env.AwsRegion
 	client := s3.NewFromConfig(cfg)
-	datasource := &S3DataSource{Client: client, bucket: env.S3Bucket}
+	datasource := &S3DataSource{Client: client, bucket: env.S3Bucket, pathPrefix: pathPrefix}
 	return datasource, nil
 }
 
@@ -62,7 +62,7 @@ func (s S3DataSource) DownloadFile(filename string) (*s3.GetObjectOutput, error)
 }
 
 func (s S3DataSource) CheckTimeStamp() error {
-	res, err := s.DownloadFile(path.Join(s.pathPrefix, "timestamp"))
+	res, err := s.DownloadFile(s.getKey("timestamp"))
 	if err != nil {
 		return err
 	}
@@ -91,7 +91,7 @@ func (s S3DataSource) CheckTimeStamp() error {
 // DownloadRunConfig
 // config descriptor should be of the format su_m_tu_w_th_f_sa_9
 func (s S3DataSource) DownloadRunConfig() (*RunConfiguration, error) {
-	res, err := s.DownloadFile(path.Join(s.pathPrefix, ConfigFile))
+	res, err := s.DownloadFile(s.getKey(ConfigFile))
 	if err != nil {
 		return nil, err
 	}
@@ -107,9 +107,9 @@ func (s S3DataSource) DownloadRunConfig() (*RunConfiguration, error) {
 	return runConfig, nil
 }
 
-func (s S3DataSource) GetAllFiles(pathPrefix string) ([]*discordgo.File, error) {
+func (s S3DataSource) GetAllFiles() ([]*discordgo.File, error) {
 	files := make([]*discordgo.File, 0)
-	keys, err := s.ListAllFilesInFolder(pathPrefix)
+	keys, err := s.ListAllFilesInFolder()
 	if err != nil {
 		return nil, err
 	}
@@ -147,10 +147,10 @@ func (s S3DataSource) ParseFile(res *s3.GetObjectOutput, key string) (file *disc
 	return file, nil
 }
 
-func (s S3DataSource) ListAllFilesInFolder(pathPrefix string) ([]string, error) {
+func (s S3DataSource) ListAllFilesInFolder() ([]string, error) {
 	res, err := s.Client.ListObjectsV2(context.TODO(), &s3.ListObjectsV2Input{
 		Bucket: aws.String(s.bucket),
-		Prefix: aws.String(pathPrefix),
+		Prefix: aws.String(s.pathPrefix),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("error listing objects: %s", err.Error())
