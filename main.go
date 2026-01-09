@@ -2,62 +2,120 @@ package main
 
 import (
 	"fmt"
+	"path"
 	"roseGelReminder/utils"
+	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/bwmarrin/discordgo"
 )
 
-const TIMESTAMP_FILE = "timestamp"
-const NEXT_DAY_MESSAGE = "next"
+const TimestampFile = "timestamp"
 
 func main() {
 	env := utils.GetEnv()
-	s, err := discordgo.New("Bot " + env.DiscordToken)
+	d, err := discordgo.New("Bot " + env.DiscordToken)
 	if err != nil {
-		fmt.Println(err)
-		return
+		panic(err)
+	}
+	pathPrefix := getPathPrefix()
+
+	s, err := utils.CreateS3Datasource(&env, pathPrefix)
+	if err != nil {
+		panic(err)
 	}
 
-	client, err := utils.CreateS3Client(env)
+	err = s.CheckTimeStamp()
 	if err != nil {
-		fmt.Println("S3 Client config error", err)
-		return
+		panic(fmt.Errorf("CheckTimeStamp error: %v", err))
 	}
 
-	d := utils.S3DataSource{Client: client}
-	err = d.CheckTimeStamp(env)
+	config, err := getConfig(s)
 	if err != nil {
-		fmt.Println(err)
-		return
+		panic(err)
 	}
 
-	today, err := d.DownloadFile(env, NEXT_DAY_MESSAGE)
+	msg, err := fetchMessageContent(s, *config)
 	if err != nil {
-		fmt.Println(err)
-		return
+		panic(err)
 	}
 
-	data := discordgo.MessageSend{Content: fmt.Sprintf("<@%s> %s", env.RoseUserId, today), AllowedMentions: &discordgo.MessageAllowedMentions{Users: []string{env.RoseUserId}}}
-
-	res, err := s.ChannelMessageSendComplex(env.ChannelId, &data)
+	data, err, isLeft := constructMessage(env, msg, *config, s)
 	if err != nil {
-		fmt.Println("s.ChannelMessageSendComplex error", err)
-	} else {
-		fmt.Println("Send successful", res)
-		err = d.UploadFile(env, res.Timestamp.Format(time.UnixDate), TIMESTAMP_FILE)
-		if err != nil {
-			fmt.Println("Upload error: ", err)
+		panic(err)
+	}
+
+	res, err := d.ChannelMessageSendComplex(env.ChannelId, data)
+	if err != nil {
+		panic(fmt.Sprint("d.ChannelMessageSendComplex error", err))
+	}
+
+	fmt.Println("Send successful", res)
+	err = s.UploadFile(res.Timestamp.Format(time.UnixDate), TimestampFile)
+	if err != nil {
+		panic(fmt.Sprint("timestamp upload error", err))
+	}
+
+	if config.IsGel {
+		key := path.Join(pathPrefix, config.FileName)
+		if isLeft {
+			err = s.UploadFile("right", key)
 		} else {
-			// Upload opposite of what we sent today
-			if today == "left" {
-				err = d.UploadFile(env, "right", NEXT_DAY_MESSAGE)
-			} else if today == "right" {
-				err = d.UploadFile(env, "left", NEXT_DAY_MESSAGE)
-			}
-			if err != nil {
-				fmt.Println("Upload errors: ", err)
-			}
+			err = s.UploadFile("left", key)
+		}
+		if err != nil {
+			fmt.Println("Upload errors: ", err)
 		}
 	}
+}
+
+func getPathPrefix() string {
+	now := time.Now()
+	weekday := strings.ToLower(now.Weekday().String())
+	hour := fmt.Sprintf("%02d00", now.Hour())
+	return path.Join(weekday, hour)
+}
+
+func fetchMessageContent(s *utils.S3DataSource, config utils.RunConfiguration) (*s3.GetObjectOutput, error) {
+	file, err := s.DownloadFile(config.FileName)
+	if err != nil {
+		return nil, fmt.Errorf("DownloadFile error: %v", err)
+	}
+
+	return file, nil
+}
+
+func getConfig(s *utils.S3DataSource) (*utils.RunConfiguration, error) {
+	config, err := s.DownloadRunConfig()
+	if err != nil {
+		return nil, fmt.Errorf("DownloadRunConfig error: %v", err)
+	}
+
+	if config == nil {
+		return nil, fmt.Errorf("no config found")
+	}
+
+	return config, nil
+}
+
+func constructMessage(env utils.Env, file *s3.GetObjectOutput, config utils.RunConfiguration, s *utils.S3DataSource) (data *discordgo.MessageSend, err error, isLeft bool) {
+	if config.IsGel {
+		content, err := s.ParseResponseToString(file)
+		if err != nil {
+			return nil, fmt.Errorf("ParseResponseToString error: %v", err), false
+		}
+		data = &discordgo.MessageSend{Content: fmt.Sprintf("<@%s> %s", env.RoseUserId, content), AllowedMentions: &discordgo.MessageAllowedMentions{Users: []string{env.RoseUserId}}}
+		isLeft = content == "left"
+	} else {
+		discordData, err := s.ParseFile(file, config.FileName)
+		if err != nil {
+			return nil, fmt.Errorf("ParseFile error: %v", err), false
+		}
+		data = &discordgo.MessageSend{}
+		data.Files = make([]*discordgo.File, 0)
+		data.Files = append(data.Files, discordData)
+	}
+
+	return data, nil, isLeft
 }
