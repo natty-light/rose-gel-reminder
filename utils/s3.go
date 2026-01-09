@@ -92,7 +92,7 @@ func (s S3DataSource) CheckTimeStamp() error {
 // DownloadRunConfig
 // config descriptor should be of the format su_m_tu_w_th_f_sa_9
 func (s S3DataSource) DownloadRunConfig() (*RunConfiguration, error) {
-	res, err := s.DownloadFile(s.getKey(ConfigFile))
+	res, err := s.DownloadFile(ConfigFile)
 	if err != nil {
 		return nil, err
 	}

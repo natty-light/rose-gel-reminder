@@ -20,6 +20,9 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	d.Identify.Intents = discordgo.MakeIntent(discordgo.IntentsGuilds | discordgo.IntentsGuildMembers)
+
 	pathPrefix := getPathPrefix()
 
 	s, err := utils.CreateS3Datasource(env, pathPrefix)
@@ -52,9 +55,10 @@ func main() {
 		panic(fmt.Sprint("d.ChannelMessageSendComplex error", err))
 	}
 
-	fmt.Println("Send successful", res)
+	log.Printf("Send successful %v", res)
 	newTimestamp := res.Timestamp.Format(time.UnixDate)
 	err = s.UploadFile(newTimestamp, TimestampFile)
+	log.Printf("uploaded timestamp %s", newTimestamp)
 	if err != nil {
 		panic(fmt.Sprint("timestamp upload error", err))
 	}
@@ -69,6 +73,8 @@ func main() {
 		if err != nil {
 			fmt.Println("Upload errors: ", err)
 		}
+
+		log.Printf("uploaded next gel run %s", config.FileName)
 	}
 }
 
@@ -83,6 +89,8 @@ func fetchMessageContent(s *utils.S3DataSource, config *utils.RunConfiguration) 
 		return nil, fmt.Errorf("DownloadFile error: %v", err)
 	}
 
+	log.Printf("fetchMessageContent downloaded file %s", config.FileName)
+
 	return file, nil
 }
 
@@ -95,6 +103,8 @@ func getConfig(s *utils.S3DataSource) (*utils.RunConfiguration, error) {
 	if config == nil {
 		return nil, fmt.Errorf("no config found")
 	}
+
+	log.Println("getConfig downloaded config successfully")
 
 	return config, nil
 }
@@ -120,6 +130,7 @@ func constructMessage(env *utils.Env, file *s3.GetObjectOutput, config *utils.Ru
 		if err != nil {
 			log.Printf("GetGuildMembers error: %v", err)
 		}
+		log.Printf("GetGuildMembers: found %d users", len(users))
 		filteredUserIds := make([]string, 0)
 		for _, user := range users {
 			canTag := true
@@ -138,10 +149,13 @@ func constructMessage(env *utils.Env, file *s3.GetObjectOutput, config *utils.Ru
 		selectedIdx := r.Intn(len(filteredUserIds))
 
 		tagUser := filteredUserIds[selectedIdx]
+		log.Printf("Selected user: %s", tagUser)
 
 		data.AllowedMentions = &discordgo.MessageAllowedMentions{Users: []string{tagUser}}
-		data.Content = fmt.Sprintf("<@%s>", config.TagUser)
+		data.Content = fmt.Sprintf("<@%s>", tagUser)
 	}
+
+	log.Println("constructMessage constructed message successfully")
 
 	return data, nil, isLeft
 }
