@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"math/rand"
 	"path"
 	"roseGelReminder/utils"
 	"time"
@@ -20,7 +22,7 @@ func main() {
 	}
 	pathPrefix := getPathPrefix()
 
-	s, err := utils.CreateS3Datasource(&env, pathPrefix)
+	s, err := utils.CreateS3Datasource(env, pathPrefix)
 	if err != nil {
 		panic(err)
 	}
@@ -35,12 +37,12 @@ func main() {
 		panic(err)
 	}
 
-	msg, err := fetchMessageContent(s, *config)
+	msg, err := fetchMessageContent(s, config)
 	if err != nil {
 		panic(err)
 	}
 
-	data, err, isLeft := constructMessage(msg, *config, s)
+	data, err, isLeft := constructMessage(env, msg, config, s, d)
 	if err != nil {
 		panic(err)
 	}
@@ -75,7 +77,7 @@ func getPathPrefix() string {
 	return fmt.Sprintf("%02d00", now.Hour())
 }
 
-func fetchMessageContent(s *utils.S3DataSource, config utils.RunConfiguration) (*s3.GetObjectOutput, error) {
+func fetchMessageContent(s *utils.S3DataSource, config *utils.RunConfiguration) (*s3.GetObjectOutput, error) {
 	file, err := s.DownloadFile(config.FileName)
 	if err != nil {
 		return nil, fmt.Errorf("DownloadFile error: %v", err)
@@ -97,7 +99,7 @@ func getConfig(s *utils.S3DataSource) (*utils.RunConfiguration, error) {
 	return config, nil
 }
 
-func constructMessage(file *s3.GetObjectOutput, config utils.RunConfiguration, s *utils.S3DataSource) (data *discordgo.MessageSend, err error, isLeft bool) {
+func constructMessage(env *utils.Env, file *s3.GetObjectOutput, config *utils.RunConfiguration, s *utils.S3DataSource, d *discordgo.Session) (data *discordgo.MessageSend, err error, isLeft bool) {
 	if config.IsGel {
 		content, err := s.ParseResponseToString(file)
 		if err != nil {
@@ -113,6 +115,32 @@ func constructMessage(file *s3.GetObjectOutput, config utils.RunConfiguration, s
 		data = &discordgo.MessageSend{}
 		data.Files = make([]*discordgo.File, 0)
 		data.Files = append(data.Files, discordData)
+
+		users, err := d.GuildMembers(env.ServerId, "", 1000)
+		if err != nil {
+			log.Printf("GetGuildMembers error: %v", err)
+		}
+		filteredUserIds := make([]string, 0)
+		for _, user := range users {
+			canTag := true
+			for _, noTag := range config.NoTagList {
+				if user.User.ID == noTag {
+					canTag = false
+				}
+			}
+			if canTag {
+				filteredUserIds = append(filteredUserIds, user.User.ID)
+			}
+		}
+
+		s := rand.NewSource(time.Now().Unix())
+		r := rand.New(s)
+		selectedIdx := r.Intn(len(filteredUserIds))
+
+		tagUser := filteredUserIds[selectedIdx]
+
+		data.AllowedMentions = &discordgo.MessageAllowedMentions{Users: []string{tagUser}}
+		data.Content = fmt.Sprintf("<@%s>", config.TagUser)
 	}
 
 	return data, nil, isLeft

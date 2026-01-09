@@ -3,4 +3,4 @@ next
 roseGelReminder
 main
 main.zip
-configs/*
+configs/**
