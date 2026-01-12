@@ -63,8 +63,7 @@ func (s S3DataSource) DownloadFile(filename string) (*s3.GetObjectOutput, error)
 }
 
 func (s S3DataSource) CheckTimeStamp() error {
-	key := s.getKey("timestamp")
-	res, err := s.DownloadFile(key)
+	res, err := s.DownloadFile("timestamp")
 	if err != nil {
 		return err
 	}
