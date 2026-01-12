@@ -63,7 +63,14 @@ func (s S3DataSource) DownloadFile(filename string) (*s3.GetObjectOutput, error)
 }
 
 func (s S3DataSource) CheckTimeStamp() error {
-	res, err := s.DownloadFile(s.getKey("timestamp"))
+	key := s.getKey("timestamp")
+	exists := s.FileExists(key)
+
+	if !exists {
+		return nil
+	}
+
+	res, err := s.DownloadFile(key)
 	if err != nil {
 		return err
 	}
@@ -176,4 +183,16 @@ func (s S3DataSource) ParseResponseToString(res *s3.GetObjectOutput) (string, er
 
 func (s S3DataSource) getKey(fileName string) string {
 	return path.Join(s.pathPrefix, fileName)
+}
+
+func (s S3DataSource) FileExists(fileName string) bool {
+	res, err := s.Client.HeadObject(context.TODO(), &s3.HeadObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(fileName),
+	})
+	if err != nil {
+		return false
+	}
+
+	return res.ContentType == nil
 }

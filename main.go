@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
-	"path"
 	"roseGelReminder/utils"
 	"time"
 
@@ -24,6 +23,7 @@ func main() {
 	d.Identify.Intents = discordgo.MakeIntent(discordgo.IntentsGuilds | discordgo.IntentsGuildMembers)
 
 	pathPrefix := getPathPrefix()
+	log.Printf("running with pathPrefix %s", pathPrefix)
 
 	s, err := utils.CreateS3Datasource(env, pathPrefix)
 	if err != nil {
@@ -64,11 +64,10 @@ func main() {
 	}
 
 	if config.IsGel {
-		key := path.Join(pathPrefix, config.FileName)
 		if isLeft {
-			err = s.UploadFile("right", key)
+			err = s.UploadFile("right", config.FileName)
 		} else {
-			err = s.UploadFile("left", key)
+			err = s.UploadFile("left", config.FileName)
 		}
 		if err != nil {
 			fmt.Println("Upload errors: ", err)
