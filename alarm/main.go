@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/bwmarrin/discordgo"
 )
 
@@ -25,7 +26,7 @@ func GetEnv() *Env {
 	return env
 }
 
-func main() {
+func handleRequest() {
 	env := GetEnv()
 	d, err := discordgo.New("Bot " + env.DiscordToken)
 	if err != nil {
@@ -39,4 +40,8 @@ func main() {
 		log.Fatal(err)
 	}
 	log.Println("notified support developer")
+}
+
+func main() {
+	lambda.Start(handleRequest)
 }
