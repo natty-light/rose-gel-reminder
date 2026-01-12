@@ -64,12 +64,6 @@ func (s S3DataSource) DownloadFile(filename string) (*s3.GetObjectOutput, error)
 
 func (s S3DataSource) CheckTimeStamp() error {
 	key := s.getKey("timestamp")
-	exists := s.FileExists(key)
-
-	if !exists {
-		return nil
-	}
-
 	res, err := s.DownloadFile(key)
 	if err != nil {
 		return err
