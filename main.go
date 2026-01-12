@@ -24,6 +24,7 @@ func main() {
 	d.Identify.Intents = discordgo.MakeIntent(discordgo.IntentsGuilds | discordgo.IntentsGuildMembers)
 
 	pathPrefix := getPathPrefix()
+	log.Printf("running with pathPrefix %s", pathPrefix)
 
 	s, err := utils.CreateS3Datasource(env, pathPrefix)
 	if err != nil {
